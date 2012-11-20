@@ -6,11 +6,7 @@
  * <code>
  *   require_once 'ZendeskClient.php';
  *
- *   $client = new ZendeskClient([
- *       'subdomain' => 'YOUR_SUBDOMAIN',
- *       'username'  => 'YOUR_LOGIN',
- *       'token'     => 'YOUR_TOKEN'
- *   ]);
+ *   $client = new ZendeskClient('YOUR_SUBDOMAIN', 'YOUR_LOGIN', 'YOUR_TOKEN');
  *
  *   $jsonData = ['subject'   => 'My printer is on fire!',
  *                'comment'   => ['body' => 'The smoke is very colorful.'],
@@ -23,7 +19,7 @@
  *
  * @link    http://developer.zendesk.com/documentation/rest_api/introduction.html
  * @author  Bohdan Zhuravel <bohdan@zhuravel.biz>
- * @version 1.0
+ * @version 1.1
  */
 class ZendeskClient
 {
@@ -69,45 +65,45 @@ class ZendeskClient
     /** @var string */
     private $token;
 
-    /** @var Zend_Http_Client */
-    private $client;
-
     /**
-     * @param array $options
+     * @param string $subdomain
+     * @param string $username
+     * @param string $token
      */
-    public function __construct(array $options)
+    public function __construct($subdomain, $username, $token)
     {
-        $this->subdomain = $options['subdomain'];
-        $this->username  = $options['username'];
-        $this->token     = $options['token'];
-
-        $this->client    = new Zend_Http_Client();
-        $this->client->setAdapter(new Zend_Http_Client_Adapter_Curl());
+        $this->subdomain = $subdomain;
+        $this->username  = $username;
+        $this->token     = $token;
     }
 
     /**
      * @param  string $page
-     * @param  array  $jsonData
      * @param  string $method
+     * @param  array  $jsonData
+     * @param  mixed  $query
      * @return array
      */
-    private function _request($page, $method = 'GET', array $jsonData = null)
+    private function _request($page, $method = 'GET', array $jsonData = null, $query = null)
     {
-        $this->client
-             ->setUri("https://{$this->subdomain}.zendesk.com/api/v2/{$page}.json")
-             ->setHeaders('Accept', 'application/json')
-             ->setHeaders('Content-Type', 'application/json');
+        $client = new Zend_Http_Client();
+        $client->setAdapter(new Zend_Http_Client_Adapter_Curl());
 
-        $this->client->getAdapter()
-             ->setCurlOption(CURLOPT_USERPWD, "{$this->username}/token:{$this->token}");
+        $client
+            ->setUri("https://{$this->subdomain}.zendesk.com/api/v2/{$page}{$query}.json")
+            ->setHeaders('Accept', 'application/json')
+            ->setHeaders('Content-Type', 'application/json');
+
+        $client->getAdapter()
+            ->setCurlOption(CURLOPT_USERPWD, "{$this->username}/token:{$this->token}");
 
         if ($method == 'POST' || $method == 'PUT') {
-            $this->client
-                 ->setRawData(Zend_Json::encode([$this->_singular($page) => $jsonData]));
+            $client
+                ->setRawData(Zend_Json::encode([$this->_singular($page) => $jsonData]));
         }
 
         try {
-            $response = $this->client->request($method);
+            $response = $client->request($method);
         } catch (Zend_Http_Client_Exception $e) {
             // Timeout or host not accessible
             return false;
@@ -145,27 +141,30 @@ class ZendeskClient
 
     /**
      * @param string $page
+     * @param string $query
      */
-    public function get($page)
+    public function get($page, $query = null)
     {
-        return $this->_request($page);
+        return $this->_request($page, 'GET', null, $query);
     }
 
     /**
      * @param string $page
      * @param array  $jsonData
+     * @param string $query
      */
-    public function update($page, array $jsonData)
+    public function update($page, array $jsonData, $query = null)
     {
-        return $this->_request($page, 'PUT', $jsonData);
+        return $this->_request($page, 'PUT', $jsonData, $query);
     }
 
     /**
      * @param string $page
+     * @param string $query
      */
-    public function delete($page)
+    public function delete($page, $query = null)
     {
-        return $this->_request($page, 'DELETE');
+        return $this->_request($page, 'DELETE', null, $query);
     }
 
 }
